@@ -13,18 +13,13 @@ def main(page: ft.Page):
     page.window.height = 350
     page.window.width = 400
     page.bgcolor = ft.Colors.AMBER_ACCENT
-    page.theme_mode = ft.ThemeMode.LIGHT
-    
-   
-    
 
-    page_title = ft.Text(
+    login_title = ft.Text(
         value="User Login",
         size=20,
         weight=ft.FontWeight.BOLD,
         font_family="Arial",
         text_align=ft.TextAlign.CENTER,
-        color = ft.Colors.BLACK
     )
     
     username_input = ft.TextField(
@@ -34,7 +29,7 @@ def main(page: ft.Page):
         width=300,
         autofocus=True,
         bgcolor=ft.Colors.LIGHT_BLUE_ACCENT,
-        icon=ft.Icon(name=ft.Icons.PERSON)   
+        prefix_icon=ft.icons.PERSON,
     )
     
     password_input = ft.TextField(
@@ -45,7 +40,7 @@ def main(page: ft.Page):
         password=True,
         can_reveal_password=True,
         bgcolor=ft.Colors.LIGHT_BLUE_ACCENT,
-        icon=ft.Icon(name=ft.Icons.PASSWORD)        
+        prefix_icon=ft.icons.LOCK,        
     )
     
     def login_click(e):
@@ -55,7 +50,7 @@ def main(page: ft.Page):
 
         success_dialog = ft.AlertDialog(
             modal=True,
-            icon=ft.Icon(name=ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN),
+            icon=ft.Icon(ft.icons.CHECK_CIRCLE, color=ft.Colors.GREEN, size=40),
             title=ft.Text("Login Successful", size=20, weight=ft.FontWeight.BOLD),
             content=ft.Text(f"Welcome, {username_input.value}!", text_align=ft.TextAlign.CENTER),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog(success_dialog))],
@@ -64,7 +59,7 @@ def main(page: ft.Page):
 
         failure_dialog = ft.AlertDialog(
             modal=True,
-            icon = ft.Icon(name=ft.Icons.ERROR, color=ft.Colors.RED),
+            icon=ft.Icon(ft.icons.ERROR, color=ft.Colors.RED, size=40),
             title=ft.Text("Login Failed", size=20, weight=ft.FontWeight.BOLD),
             content=ft.Text("Invalid username or password", text_align=ft.TextAlign.CENTER),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog(failure_dialog))],
@@ -73,7 +68,7 @@ def main(page: ft.Page):
 
         invalid_input_dialog = ft.AlertDialog(
             modal=True,
-            icon=ft.Icon(name=ft.Icons.INFO, color=ft.Colors.BLUE),
+            icon=ft.Icon(ft.icons.INFO, color=ft.Colors.BLUE, size=40),
             title=ft.Text("Input Error", size=20, weight=ft.FontWeight.BOLD),
             content=ft.Text("Please enter username and password", text_align=ft.TextAlign.CENTER),
             actions=[ft.TextButton("OK", on_click=lambda e: close_dialog(invalid_input_dialog))],
@@ -82,6 +77,7 @@ def main(page: ft.Page):
 
         database_error_dialog = ft.AlertDialog(
             modal=True,
+            icon=ft.Icon(ft.icons.DATABASE, color=ft.Colors.ORANGE, size=40),
             title=ft.Text("Database Error", size=20, weight=ft.FontWeight.BOLD),
             content=ft.Text("An error occurred while connecting to the database",
                             text_align=ft.TextAlign.CENTER),
@@ -89,48 +85,49 @@ def main(page: ft.Page):
             actions_alignment=ft.MainAxisAlignment.CENTER,
         )
 
-        if username_input.value and password_input.value:
-            try:
-                db = connect_db()
-                cursor = db.cursor()
+        # --- Validation and authentication ---
+        if not username_input.value or not password_input.value:
+            page.dialog = invalid_input_dialog
+            invalid_input_dialog.open = True
+            page.update()
+            return
 
-                query = "SELECT * FROM users WHERE username = %s AND password = %s"
-
-                cursor.execute(query, (username_input.value, password_input.value))
-
-                result = cursor.fetchone()
-
-                if result:
-                    page.open(success_dialog)
-                else:
-                    page.open(failure_dialog)
-                page.update()
-            except mysql.connector.Error:
-                page.open(database_error_dialog)
-            finally:
-                if cursor:
-                    cursor.close()
-                if db:
-                    db.close()
-        else:
-            page.open(invalid_input_dialog)
-    
-    login_button = ft.ElevatedButton(text="Login", width=100, icon=ft.Icons.LOGIN,on_click=login_click)
-
-    page.add(page_title, 
-            ft.Container(
-                content=ft.Column([username_input, password_input],
-                spacing = 20
-                )
-            ), 
-            ft.Container(
-                content = login_button,
-                margin = ft.Margin(0, 20, 40, 0),
-                alignment = ft.alignment.top_right
+        try:
+            conn = connect_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM users WHERE username=%s AND password=%s",
+                (username_input.value, password_input.value)
             )
-        )
-    page.update()
+            result = cursor.fetchone()
+            conn.close()
 
+            if result:
+                page.dialog = success_dialog
+                success_dialog.open = True
+            else:
+                page.dialog = failure_dialog
+                failure_dialog.open = True
+
+        except mysql.connector.Error:
+            page.dialog = database_error_dialog
+            database_error_dialog.open = True
+
+        page.update()
+            
+    # ✅ fixed ElevatedButton
+    login_button = ft.ElevatedButton(
+        text="Login",           # <<< changed: added `text=`
+        icon=ft.Icons.LOGIN,    # <<< changed: fixed typo (was ft.iconns.LOGIN)
+        on_click=login_click,
+        width=100
+    )
+        
+    # UI components    
+    page.add(login_title)
+    page.add(username_input)
+    page.add(password_input)
+    page.add(login_button)   
     
-
-ft.app(target=main)
+    
+ft.app(target=main)   # <<< changed: must use target=main
